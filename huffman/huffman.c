@@ -142,11 +142,14 @@ HuffmanTree huffman_tree_load(BitSR reader)
 
     // Read frequencies from file
     uint8_t tempFreq[sizeof(int)];
-    int frequencies[POSSIBLE_BYTES];
+    int frequencies[POSSIBLE_BYTES] = {0};
     for (int i = 0; i < POSSIBLE_BYTES; i++)
     {
         bsr_read_bytes(reader, tempFreq, sizeof(int));
-        memcpy(frequencies + i, tempFreq, sizeof(int));
+        if (tempFreq[0] == 0)
+            break; // End of frequencies
+
+        frequencies[tempFreq[0]] = (int)tempFreq[1] << 16 | (int)tempFreq[2] << 8 | (int)tempFreq[3];
     }
 
     // Rebuild the Huffman tree using the frequencies
@@ -162,28 +165,51 @@ bool huffman_tree_save(HuffmanTree tree, BitSW writer)
     // Save frequencies (only used for tree reconstruction)
     int freqTemp[POSSIBLE_BYTES] = {0}; // Temporary buffer for writing frequencies
     get_frequencies(tree, freqTemp);
-    uint8_t frequencies[sizeof(int) * POSSIBLE_BYTES] = {0};
-    memcpy(frequencies, freqTemp, POSSIBLE_BYTES * sizeof(int)); // Copy frequency to buffer
+
+    uint8_t frequencies[sizeof(int)] = {0};
+    for (int i = 0; i < POSSIBLE_BYTES; i++)
+        if (freqTemp[i] > 0)
+        {
+            frequencies[0] = (uint8_t)i;          // Store the byte value in the first byte of the array
+            for (int j = 1; j < sizeof(int); j++) // Store the frequency in the next 3 bytes
+                frequencies[j] = (uint8_t)(freqTemp[i] >> (sizeof(uint8_t) * 8 * (sizeof(int) - 1 - j)));
+
+            bsw_write_bytes(writer, frequencies, sizeof(int)); // Write the 4 bytes
+        }
+
+    bsw_write_byte(writer, 0);
+    // These bytes are unused, so you found an easter egg
+    bsw_write_byte(writer, 'H');
+    bsw_write_byte(writer, 'e');
+    bsw_write_byte(writer, 'y');
 
     // Write frequencies to file
-    return bsw_write_bytes(writer, frequencies, sizeof(frequencies));
+    bsw_align_to_byte(writer);
+    return bsw_flush(writer);
 }
 
-uint8_t *huffman_get_code(HuffmanTree tree, uint8_t byte)
+uint8_t *huffman_tree_get_code(HuffmanTree tree, uint8_t byte)
 {
     if (tree == NULL || tree->codes == NULL)
         return NULL;
     return tree->codes[byte];
 }
 
-int huffman_get_code_length(HuffmanTree tree, uint8_t byte)
+int huffman_tree_get_code_length(HuffmanTree tree, uint8_t byte)
 {
     if (tree == NULL || tree->code_lengths == NULL)
         return -1;
     return tree->code_lengths[byte];
 }
 
-int huffman_decode_bit(HuffmanTree tree, int bit, uint8_t *decoded_byte)
+uint64_t huffman_tree_total_frequencies(HuffmanTree tree)
+{
+    if (tree == NULL || tree->root == NULL)
+        return 0;
+    return tree->root->frequency;
+}
+
+int huffman_tree_decode_bit(HuffmanTree tree, int bit, uint8_t *decoded_byte)
 {
     if (tree == NULL || decoded_byte == NULL)
         return -1;

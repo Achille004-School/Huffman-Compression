@@ -32,14 +32,14 @@ int main(int argc, char *argv[])
     reader = bsr_create(input_file, 0);
     if (!reader)
     {
-        printf("Error: Could not create reader\n");
+        perror("Error: Could not create reader\n");
         goto exit;
     }
 
     writer = bsw_create(output_file, 0);
     if (!writer)
     {
-        printf("Error: Could not create writer\n");
+        perror("Error: Could not create writer\n");
         goto exit;
     }
 
@@ -57,21 +57,13 @@ int main(int argc, char *argv[])
     }
     else
     {
-        printf("Invalid command. Use 'zip' or 'unzip'.\n");
+        perror("Invalid command. Use 'zip' or 'unzip'.\n");
     }
 
 exit:
     bsr_free(reader);
     bsw_free(writer);
     return outCode;
-}
-
-// Helper function to count frequencies of bytes in the input file
-void count_frequencies(BitSR reader, int *frequencies)
-{
-    uint8_t byte;
-    while (bsr_read_byte(reader, &byte))
-        frequencies[byte]++;
 }
 
 int huffman_compress(BitSR reader, BitSW writer)
@@ -86,21 +78,19 @@ int huffman_compress(BitSR reader, BitSW writer)
     HuffmanTree tree = huffman_tree_create(frequencies);
     if (!tree)
     {
-        fprintf(stderr, "Error: Could not create Huffman tree\n");
+        perror("Error: Could not create Huffman tree\n");
         return EXIT_FAILURE;
     }
-
+    
     huffman_tree_save(tree, writer);
-    bsw_write_padding_line(writer); // Add padding line
-    bsw_flush(writer);              // Ensure all data is written
 
     // Reset the reader to the beginning of the file
     bsr_rewind(reader);
     while (bsr_read_byte(reader, &byte))
     {
         // Write the Huffman code for the byte to the output file
-        uint8_t *code = huffman_get_code(tree, byte);
-        int code_length = huffman_get_code_length(tree, byte);
+        uint8_t *code = huffman_tree_get_code(tree, byte);
+        int code_length = huffman_tree_get_code_length(tree, byte);
 
         if (code && code_length > 0)
         {
@@ -116,7 +106,6 @@ int huffman_compress(BitSR reader, BitSW writer)
         }
     }
 
-    printf("All done!\n");
     // Flush the writer buffer to ensure all data is written
     huffman_tree_destroy(tree);
     bsw_align_to_byte(writer);
@@ -130,18 +119,16 @@ int huffman_decompress(BitSR reader, BitSW writer)
     HuffmanTree tree = huffman_tree_load(reader);
     if (!tree)
     {
-        fprintf(stderr, "Error: Could not create Huffman tree\n");
+        perror("Error: Could not create Huffman tree\n");
         return EXIT_FAILURE;
     }
 
+    uint64_t bytesLeft = huffman_tree_total_frequencies(tree);
     uint8_t bit, byte;
-    for (int i = 0; i < 16; i++)
-        bsr_read_byte(reader, &byte); // Skip the padding line
-
-    while (bsr_read_bit(reader, &bit))
+    while (bsr_read_bit(reader, &bit) && bytesLeft > 0)
     {
         // Write the Huffman code for the byte to the output file
-        int status = huffman_decode_bit(tree, bit, &byte);
+        int status = huffman_tree_decode_bit(tree, bit, &byte);
 
         switch (status)
         {
@@ -149,24 +136,18 @@ int huffman_decompress(BitSR reader, BitSW writer)
             break;
         case 1: // Found a byte, write it to the output file
             bsw_write_byte(writer, byte);
+            bytesLeft--;
             break;
         case -1: // Error in decoding
-            fprintf(stderr, "Error: Could not decode Huffman code\n");
+            perror("Error: Could not decode Huffman code\n");
             huffman_tree_destroy(tree);
             return EXIT_FAILURE;
         }
     }
 
-    printf("All done!\n");
     // Flush the writer buffer to ensure all data is written
     huffman_tree_destroy(tree);
     bsw_align_to_byte(writer);
     bsw_flush(writer);
     return EXIT_SUCCESS;
 }
-
-/*
-File header needs to be changed so that it only writes needed info.
-- first 8 bits: byte referenced
-- next 24 bits: frequency of the byte
-*/

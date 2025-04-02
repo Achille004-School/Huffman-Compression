@@ -39,12 +39,13 @@ BitSW bsw_create_from_file(const char *filename, size_t buffer_size, bool close_
         return NULL;
 
     BitSW writer = (BitSW)malloc(sizeof *writer);
-    if (!writer) {
+    if (!writer)
+    {
         fclose(file);
         return NULL;
     }
 
-    if(buffer_size == 0)
+    if (buffer_size == 0)
         buffer_size = DEFAULT_BUFFER_SIZE;
 
     writer->buffer = (uint8_t *)malloc(buffer_size);
@@ -131,7 +132,7 @@ bool bsw_write_byte(BitSW writer, uint8_t byte)
         bool res = add_byte_to_buffer(writer, byte);
         if (!res)
             return false;
-        
+
         writer->total_bits += 8;
         return true;
     }
@@ -148,7 +149,7 @@ bool bsw_write_bytes(BitSW writer, uint8_t *data, size_t size)
         return false;
 
     // If we're at a byte boundary and have a lot of data, use optimized path
-    if (writer->bit_pos == 0  && size > 8)
+    if (writer->bit_pos == 0 && size > 8)
     {
         // Flush any existing buffer content
         if (writer->buffer_pos > 0 && !flush_buffer(writer))
@@ -229,18 +230,6 @@ bool bsw_align_to_byte(BitSW writer)
     writer->bit_pos = 0;
 
     return true;
-}
-
-void bsw_write_padding_line(BitSW writer)
-{
-    if (!writer)
-        return;
-
-    bsw_align_to_byte(writer);
-
-    char *padding = "A great padding!";
-    for (int i = 0; i < 16; i++)
-        bsw_write_byte(writer, padding[i]);
 }
 
 uint64_t bsw_get_bits_written(BitSW writer)

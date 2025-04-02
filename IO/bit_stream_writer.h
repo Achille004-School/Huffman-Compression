@@ -103,15 +103,6 @@ bool bsw_flush(BitSW writer);
 bool bsw_align_to_byte(BitSW writer);
 
 /**
- * @brief Writes a padding line to the file
- *
- * This is used to separate different sections of data in the file.
- *
- * @param writer The BitStreamWriter
- */
-void bsw_write_padding_line(BitSW writer);
-
-/**
  * @brief Returns the total number of bits written so far
  *
  * @param writer The BitStreamWriter
