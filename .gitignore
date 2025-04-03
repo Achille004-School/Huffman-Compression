@@ -1,5 +1,9 @@
 *.exe
+
+# Test files
 *.txt
+*.jpg
+*.png
 *.huf
 
 .vscode/

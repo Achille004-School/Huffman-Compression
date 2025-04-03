@@ -146,10 +146,10 @@ HuffmanTree huffman_tree_load(BitSR reader)
     for (int i = 0; i < POSSIBLE_BYTES; i++)
     {
         bsr_read_bytes(reader, tempFreq, sizeof(int));
-        if (tempFreq[0] == 0)
+        int frequency = (int)tempFreq[1] << 16 | (int)tempFreq[2] << 8 | (int)tempFreq[3];
+        if (frequency == 0)
             break; // End of frequencies
-
-        frequencies[tempFreq[0]] = (int)tempFreq[1] << 16 | (int)tempFreq[2] << 8 | (int)tempFreq[3];
+        frequencies[tempFreq[0]] = frequency;
     }
 
     // Rebuild the Huffman tree using the frequencies
@@ -177,11 +177,8 @@ bool huffman_tree_save(HuffmanTree tree, BitSW writer)
             bsw_write_bytes(writer, frequencies, sizeof(int)); // Write the 4 bytes
         }
 
-    bsw_write_byte(writer, 0);
-    // These bytes are unused, so you found an easter egg
-    bsw_write_byte(writer, 'H');
-    bsw_write_byte(writer, 'e');
-    bsw_write_byte(writer, 'y');
+    for (int i = 0; i < sizeof(int); i++)
+        bsw_write_byte(writer, 0);
 
     // Write frequencies to file
     bsw_align_to_byte(writer);
