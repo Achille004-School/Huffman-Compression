@@ -12,6 +12,7 @@ To run it, just use `./hufffman` and it will show how to properly run it.
 ## How it works
 
 This code implements :
+
 - A general-purpose (`void *`) minimum priority queue
 - Stream reader and writer each capable of working on single bits
 - An Huffman tree builder, encoder and decoder
@@ -22,6 +23,4 @@ And then the main, which just provides the interface to these ADTs.
 
 ## Limits
 
-The Huffman codes works well with a lot of the same data, but small amounts of varying data it might even output a larger file.
-
-Also, I'm aware of a subtle bug when compressing varying data in which the uncompressed file will be different.
+The Huffman codes works well with a lot of the same data, but with small amounts of varying data it might even output a larger file.

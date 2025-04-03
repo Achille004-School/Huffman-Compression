@@ -57,9 +57,9 @@ bool bsr_read_bit(BitSR reader, uint8_t* bit);
  * @param reader The BitStreamReader
  * @param value Pointer to store the read bits
  * @param num_bits The number of bits to read
- * @return true if successful, false on error or end of file
+ * @return Number of bits successfully read, may be less than size at EOF
  */
-bool bsr_read_bits(BitSR reader, uint8_t* value, uint8_t num_bits);
+size_t bsr_read_bits(BitSR reader, uint8_t* value, size_t num_bits);
 
 /**
  * @brief Reads a byte (8 bits) from the stream

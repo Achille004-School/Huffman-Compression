@@ -109,20 +109,20 @@ bool bsw_write_bit(BitSW writer, uint8_t bit)
     return true;
 }
 
-bool bsw_write_bits(BitSW writer, uint8_t *values, uint8_t num_bits)
+size_t bsw_write_bits(BitSW writer, uint8_t *values, size_t num_bits)
 {
     if (!writer || !values || writer->has_error || num_bits > 64)
-        return false;
+        return 0;
 
     // Write bits from most significant to least significant
-    for (int i = 0; i < num_bits; i++)
+    for (size_t i = 0; i < num_bits; i++)
     {
         uint8_t bit = (values[i / 8] >> (7 - (i % 8))) & 1;
         if (!bsw_write_bit(writer, bit))
-            return false;
+            return i;
     }
 
-    return true;
+    return num_bits;
 }
 
 bool bsw_write_byte(BitSW writer, uint8_t byte)
@@ -140,20 +140,20 @@ bool bsw_write_byte(BitSW writer, uint8_t byte)
     uint8_t bits[8];
     for (int i = 0; i < 8; i++)
         bits[i] = (byte >> (7 - i)) & 1;
-    return bsw_write_bits(writer, bits, 8);
+    return bsw_write_bits(writer, bits, 8) == 8;
 }
 
-bool bsw_write_bytes(BitSW writer, uint8_t *data, size_t size)
+size_t bsw_write_bytes(BitSW writer, uint8_t *data, size_t size)
 {
     if (!writer || !data || writer->has_error)
-        return false;
+        return 0;
 
     // If we're at a byte boundary and have a lot of data, use optimized path
     if (writer->bit_pos == 0 && size > 8)
     {
         // Flush any existing buffer content
         if (writer->buffer_pos > 0 && !flush_buffer(writer))
-            return false;
+            return 0;
 
         // Write directly to the file if data is larger than buffer
         if (size >= writer->buffer_size)
@@ -162,25 +162,25 @@ bool bsw_write_bytes(BitSW writer, uint8_t *data, size_t size)
             if (bytes_written != size)
             {
                 writer->has_error = true;
-                return false;
+                return bytes_written;
             }
             writer->total_bits += (size * 8);
-            return true;
+            return bytes_written;
         }
 
         // Otherwise, copy to the buffer
         memcpy(writer->buffer, data, size);
         writer->buffer_pos = size;
         writer->total_bits += (size * 8);
-        return true;
+        return size;
     }
 
     // For small data or non-byte-aligned positions, write byte by byte
     for (size_t i = 0; i < size; i++)
         if (!bsw_write_byte(writer, data[i]))
-            return false;
+            return i;
 
-    return true;
+    return size;
 }
 
 bool bsw_flush(BitSW writer)

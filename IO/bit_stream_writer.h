@@ -59,9 +59,9 @@ bool bsw_write_bit(BitSW writer, uint8_t bit);
  * @param writer The BitStreamWriter
  * @param value The bits to write
  * @param num_bits The number of bits to write (must be <= 64)
- * @return true if successful, false on error
+ * @return Number of bits successfully written
  */
-bool bsw_write_bits(BitSW writer, uint8_t *value, uint8_t num_bits);
+size_t bsw_write_bits(BitSW writer, uint8_t *value, size_t num_bits);
 
 /**
  * @brief Writes a byte (8 bits) to the stream
@@ -78,9 +78,9 @@ bool bsw_write_byte(BitSW writer, uint8_t byte);
  * @param writer The BitStreamWriter
  * @param data The bytes to write
  * @param size The number of bytes to write
- * @return true if successful, false on error
+ * @return Number of bytes successfully written
  */
-bool bsw_write_bytes(BitSW writer, uint8_t *data, size_t size);
+size_t bsw_write_bytes(BitSW writer, uint8_t *data, size_t size);
 
 /**
  * @brief Flushes any pending bits in the buffer to the file

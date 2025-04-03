@@ -93,12 +93,8 @@ bool bsr_read_bit(BitSR reader, uint8_t *bit)
         return false;
 
     // If we've read all bits in current byte, get next byte
-    if (reader->bit_pos >= 8)
-    {
-        if (!read_next_byte(reader))
-            return false; // EOF or error occurred
-        reader->bit_pos = 0;
-    }
+    if (!read_next_byte(reader))
+        return false; // EOF or error occurred
 
     // Extract the bit at the current position
     *bit = (reader->current_byte >> (7 - reader->bit_pos)) & 1;
@@ -110,20 +106,18 @@ bool bsr_read_bit(BitSR reader, uint8_t *bit)
     return true;
 }
 
-bool bsr_read_bits(BitSR reader, uint8_t *value, uint8_t num_bits)
+size_t bsr_read_bits(BitSR reader, uint8_t *value, size_t num_bits)
 {
     if (!reader || !value || reader->has_error)
-        return false;
+        return 0;
 
     // Read bits one at a time from most significant to least significant
-    for (int i = 0; i < num_bits; i++)
-    {
-        uint8_t bit;
+    uint8_t bit;
+    for (size_t i = 0; i < num_bits; i++)
         if (!bsr_read_bit(reader, value + i))
-            return false;
-    }
+            return i;
 
-    return true; // Add this return statement
+    return num_bits;
 }
 
 bool bsr_read_byte(BitSR reader, uint8_t *byte)
@@ -131,25 +125,33 @@ bool bsr_read_byte(BitSR reader, uint8_t *byte)
     if (!reader || !byte || reader->has_error)
         return false;
 
+    // If we've read all bits in current byte, get next byte
+    if (!read_next_byte(reader))
+        return false; // EOF or error occurred
+
     // If we're at a byte boundary, read directly for better performance
-    if (reader->bit_pos == 0 || reader->bit_pos == 8)
+    if (reader->bit_pos == 0)
     {
-        if (!read_next_byte(reader))
-            return false;
         *byte = reader->current_byte;
         reader->bit_pos = 8; // Mark that we've read the whole byte
+        reader->total_bits += 8;
         return true;
     }
 
     // Otherwise, read bit by bit
     uint8_t value[8] = {0}; // Temporary array to hold bits
-    bool success = bsr_read_bits(reader, value, 8);
+    size_t read = bsr_read_bits(reader, value, 8);
 
-    *byte = 0; // Initialize byte to 0
-    for (int i = 0; i < 8; i++)
-        *byte |= (value[i] << (7 - i)); // Combine bits into byte
+    if (read == 8)
+    {
+        *byte = 0; // Initialize byte to 0
+        for (int i = 0; i < 8; i++)
+            *byte |= (value[i] << (7 - i)); // Combine bits into byte
 
-    return success;
+        reader->total_bits += 8;
+        return true;
+    }
+    return false;
 }
 
 size_t bsr_read_bytes(BitSR reader, uint8_t *data, size_t size)
@@ -159,20 +161,21 @@ size_t bsr_read_bytes(BitSR reader, uint8_t *data, size_t size)
 
     size_t bytes_read = 0;
 
+    // If we've read all bits in current byte, get next byte
+    if (!read_next_byte(reader))
+        return bytes_read; // EOF or error occurred
+
     // If we're at a byte boundary and have a lot of data, use optimized path
-    if (reader->bit_pos == 0 || reader->bit_pos == 8)
+    if (reader->bit_pos == 0)
     {
         // If we have a partially read byte, read the first byte normally
-        if (reader->bit_pos == 0)
-        {
-            if (!bsr_read_byte(reader, &data[0]))
-                return bytes_read;
-            bytes_read = 1;
+        if (!bsr_read_byte(reader, &data[0]))
+            return bytes_read;
+        bytes_read = 1;
 
-            // If that was all we needed, return now
-            if (size == 1)
-                return bytes_read;
-        }
+        // If that was all we needed, return now
+        if (bytes_read == size)
+            return bytes_read;
 
         // Read any leftover partial data in the buffer
         if (reader->buffer_pos < reader->buffer_filled)
@@ -215,7 +218,7 @@ size_t bsr_read_bytes(BitSR reader, uint8_t *data, size_t size)
     // For any remaining bytes or if we're not byte-aligned, read byte-by-byte
     while (bytes_read < size)
     {
-        if (!bsr_read_byte(reader, &data[bytes_read]))
+        if (!bsr_read_byte(reader, data + bytes_read))
             break;
         bytes_read++;
     }
@@ -230,10 +233,7 @@ bool bsr_align_to_byte(BitSR reader)
 
     // If already aligned, nothing to do
     if (reader->bit_pos == 0 || reader->bit_pos == 8)
-    {
-        reader->bit_pos = 0; // Reset for consistency
         return true;
-    }
 
     // Skip remaining bits in current byte
     reader->bit_pos = 8;
@@ -322,6 +322,10 @@ static bool refill_buffer(BitSR reader)
 
 static bool read_next_byte(BitSR reader)
 {
+    // If we've not read all bits in current byte, ignore the call
+    if (reader->bit_pos != 8)
+        return true;
+
     // If we're at the end of the buffer (or haven't read yet), refill
     if (reader->buffer_pos >= reader->buffer_filled)
         if (!refill_buffer(reader))

@@ -143,13 +143,14 @@ HuffmanTree huffman_tree_load(BitSR reader)
     // Read frequencies from file
     uint8_t tempFreq[sizeof(int)];
     int frequencies[POSSIBLE_BYTES] = {0};
-    for (int i = 0; i < POSSIBLE_BYTES; i++)
+    int tmpFreq;
+    while(true)
     {
         bsr_read_bytes(reader, tempFreq, sizeof(int));
-        int frequency = (int)tempFreq[1] << 16 | (int)tempFreq[2] << 8 | (int)tempFreq[3];
-        if (frequency == 0)
+        tmpFreq = (int)tempFreq[1] << 16 | (int)tempFreq[2] << 8 | (int)tempFreq[3];
+        if (tmpFreq == 0)
             break; // End of frequencies
-        frequencies[tempFreq[0]] = frequency;
+        frequencies[tempFreq[0]] = tmpFreq;
     }
 
     // Rebuild the Huffman tree using the frequencies
@@ -289,12 +290,8 @@ static void generate_codes_rec(link node, uint8_t *code, int depth, uint8_t **co
             {
                 codes[node->byte][i] = 0;
                 for (int j = 0; j < 8 && (i * 8 + j < depth); j++)
-                {
                     if (code[i * 8 + j])
-                    {
                         codes[node->byte][i] |= (1 << (7 - j)); // Set the bit if it's 1
-                    }
-                }
             }
             codes[node->byte][(depth + 7) / 8] = '\0'; // Null terminator
             code_lengths[node->byte] = depth;
